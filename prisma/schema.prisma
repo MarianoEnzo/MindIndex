@@ -1,0 +1,58 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model Collection {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  isPreloaded Boolean    @default(false) @map("is_preloaded")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  documents   Document[]
+
+  @@map("collections")
+}
+
+model Document {
+  id           String     @id @default(uuid())
+  filename     String
+  pageCount    Int        @map("page_count")
+  chunkCount   Int        @default(0) @map("chunk_count")
+  status       DocStatus  @default(PENDING)
+  collectionId String     @map("collection_id")
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  chunks       Chunk[]
+
+  @@index([collectionId])
+  @@map("documents")
+}
+
+model Chunk {
+  id         String                      @id @default(uuid())
+  content    String
+  pageNumber Int                         @map("page_number")
+  position   Int
+  tokenCount Int                         @map("token_count")
+  embedding  Unsupported("vector(1536)")?
+  documentId String                      @map("document_id")
+  document   Document                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("chunks")
+}
+
+enum DocStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
