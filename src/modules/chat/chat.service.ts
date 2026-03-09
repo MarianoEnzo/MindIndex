@@ -12,6 +12,8 @@ export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private anthropic: Anthropic;
 
+  private model: string;
+
   constructor(
     private retrievalService: RetrievalService,
     private config: ConfigService,
@@ -19,6 +21,7 @@ export class ChatService {
     this.anthropic = new Anthropic({
       apiKey: this.config.get<string>('rag.anthropicApiKey'),
     });
+    this.model = this.config.get<string>('rag.anthropicModel') ?? 'claude-sonnet-4-5';
   }
 
   async chat(query: string, collectionId: string, topK = 5): Promise<string> {
@@ -27,7 +30,7 @@ export class ChatService {
 
     try {
       const response = await this.anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
+        model: this.model,
         max_tokens: 1024,
         system: `You are a helpful assistant. Answer the user's question using only the provided context. If the answer is not in the context, say you don't know.\n\nContext:\n${context}`,
         messages: [{ role: 'user', content: query }],

@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -50,7 +51,7 @@ export class IngestionController {
   }
 
   @Post('documents/:id/reembed')
-  async regenerateEmbeddings(@Param('id') documentId: string) {
+  async regenerateEmbeddings(@Param('id', ParseUUIDPipe) documentId: string) {
     return this.ingestionService.regenerateEmbeddings(documentId);
   }
 }

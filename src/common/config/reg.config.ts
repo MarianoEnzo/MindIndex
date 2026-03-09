@@ -1,4 +1,11 @@
 import { registerAs } from "@nestjs/config";
+
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required environment variable: ${key}`);
+  return value;
+}
+
 export const ragConfig = registerAs('rag', () => ({
   embedding: {
     model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
@@ -13,6 +20,7 @@ export const ragConfig = registerAs('rag', () => ({
     topK: parseInt(process.env.RETRIEVAL_TOP_K || '5', 10),
     similarityThreshold: parseFloat(process.env.SIMILARITY_THRESHOLD || '0.7'),
   },
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  openaiApiKey: requireEnv('OPENAI_API_KEY'),
+  anthropicApiKey: requireEnv('ANTHROPIC_API_KEY'),
+  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5',
 }));

@@ -1,13 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class ChatDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(1000)
   query: string;
 
   @IsString()
   @IsNotEmpty()
+  @IsUUID()
   collectionId: string;
 
   @IsOptional()

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -55,14 +56,22 @@ export class IngestionService {
       const pdfDoc = await pdfjsLib.getDocument({ data }).promise;
       const numPages = pdfDoc.numPages;
 
+      if (numPages === 0) {
+        throw new BadRequestException('PDF has no pages');
+      }
+
       let fullText = '';
       for (let i = 1; i <= numPages; i++) {
         const page = await pdfDoc.getPage(i);
         const content = await page.getTextContent();
-        const pageText = content.items
-          .map((item: { str: string }) => item.str)
+        const pageText = (content.items ?? [])
+          .map((item: { str?: string }) => item.str ?? '')
           .join(' ');
         fullText += pageText + ' ';
+      }
+
+      if (!fullText.trim()) {
+        throw new BadRequestException('PDF contains no extractable text');
       }
 
       const chunks = this.chunkText(fullText, numPages);
@@ -98,10 +107,11 @@ export class IngestionService {
         where: { id: document.id },
         data: { status: 'FAILED' },
       });
-      this.logger.error(`Failed to process ${file.originalname}`, error);
-      throw error instanceof NotFoundException
-        ? error
-        : new InternalServerErrorException(`Failed to process document: ${file.originalname}`);
+      this.logger.error('Failed to process document', error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to process document');
     }
   }
 
