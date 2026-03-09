@@ -1,12 +1,15 @@
 import {
-  Controller,
-  Post,
+  BadRequestException,
   Body,
+  Controller,
+  Get,
+  Param,
+  Post,
   UploadedFile,
   UseInterceptors,
-  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CreateCollectionDto } from './dto/create-collection.dto';
 import { IngestionService } from './ingestion.service';
 
 @Controller('ingestion')
@@ -14,10 +17,13 @@ export class IngestionController {
   constructor(private ingestionService: IngestionService) {}
 
   @Post('collections')
-  async createCollection(
-    @Body() body: { name: string; description?: string },
-  ) {
-    return this.ingestionService.createCollection(body.name, body.description);
+  async createCollection(@Body() dto: CreateCollectionDto) {
+    return this.ingestionService.createCollection(dto.name, dto.description);
+  }
+
+  @Get('collections')
+  async getCollections() {
+    return this.ingestionService.getCollections();
   }
 
   @Post('upload')
@@ -41,5 +47,10 @@ export class IngestionController {
     if (!collectionId) throw new BadRequestException('collectionId required');
 
     return this.ingestionService.processDocument(file, collectionId);
+  }
+
+  @Post('documents/:id/reembed')
+  async regenerateEmbeddings(@Param('id') documentId: string) {
+    return this.ingestionService.regenerateEmbeddings(documentId);
   }
 }

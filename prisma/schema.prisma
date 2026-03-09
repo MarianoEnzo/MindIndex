@@ -36,14 +36,14 @@ model Document {
 }
 
 model Chunk {
-  id         String                      @id @default(uuid())
+  id         String                       @id @default(uuid())
   content    String
-  pageNumber Int                         @map("page_number")
+  pageNumber Int                          @map("page_number")
   position   Int
-  tokenCount Int                         @map("token_count")
+  tokenCount Int                          @map("token_count")
   embedding  Unsupported("vector(1536)")?
-  documentId String                      @map("document_id")
-  document   Document                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String                       @map("document_id")
+  document   Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
   @@map("chunks")
@@ -55,4 +55,3 @@ enum DocStatus {
   COMPLETED
   FAILED
 }
-

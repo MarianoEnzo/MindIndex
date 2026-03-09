@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma.service';
+import { EmbeddingsService } from '../embeddings/embedding.service';
 
 @Injectable()
 export class IngestionService {
@@ -9,6 +15,7 @@ export class IngestionService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private embeddingService: EmbeddingsService,
   ) {}
 
   async createCollection(name: string, description?: string) {
@@ -17,7 +24,21 @@ export class IngestionService {
     });
   }
 
-  async processDocument(file: { originalname: string; buffer: Buffer }, collectionId: string) {
+  async getCollections() {
+    return this.prisma.collection.findMany();
+  }
+
+  async processDocument(
+    file: { originalname: string; buffer: Buffer },
+    collectionId: string,
+  ) {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+    });
+    if (!collection) {
+      throw new NotFoundException(`Collection ${collectionId} not found`);
+    }
+
     const pdfjsLib = require('pdfjs-dist/legacy/build/pdf');
 
     const document = await this.prisma.document.create({
@@ -38,7 +59,9 @@ export class IngestionService {
       for (let i = 1; i <= numPages; i++) {
         const page = await pdfDoc.getPage(i);
         const content = await page.getTextContent();
-        const pageText = content.items.map((item: { str: string }) => item.str).join(' ');
+        const pageText = content.items
+          .map((item: { str: string }) => item.str)
+          .join(' ');
         fullText += pageText + ' ';
       }
 
@@ -63,6 +86,8 @@ export class IngestionService {
         },
       });
 
+      await this.embeddingService.generateForDocument(document.id);
+
       return {
         documentId: document.id,
         pageCount: numPages,
@@ -74,14 +99,33 @@ export class IngestionService {
         data: { status: 'FAILED' },
       });
       this.logger.error(`Failed to process ${file.originalname}`, error);
-      throw error;
+      throw error instanceof NotFoundException
+        ? error
+        : new InternalServerErrorException(`Failed to process document: ${file.originalname}`);
     }
+  }
+
+  async regenerateEmbeddings(documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!document) {
+      throw new NotFoundException(`Document ${documentId} not found`);
+    }
+
+    this.logger.log(`Regenerating embeddings for document ${documentId}`);
+    return this.embeddingService.generateForDocument(documentId);
   }
 
   private chunkText(text: string, totalPages: number) {
     const chunkSize = this.config.get<number>('rag.chunking.size') ?? 500;
     const overlap = this.config.get<number>('rag.chunking.overlap') ?? 50;
-    const chunks: { content: string; pageNumber: number; position: number; tokenCount: number }[] = [];
+    const chunks: {
+      content: string;
+      pageNumber: number;
+      position: number;
+      tokenCount: number;
+    }[] = [];
     const words = text.split(/\s+/).filter(Boolean);
     let position = 0;
 
@@ -91,7 +135,7 @@ export class IngestionService {
 
       const content = slice.join(' ');
       const estimatedPage = Math.min(
-        Math.ceil(((i / words.length) * totalPages) || 1),
+        Math.ceil((i / words.length) * totalPages || 1),
         totalPages,
       );
 

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install class-validator class-transformer @nestjs/throttler)"
+    ]
+  }
+}
