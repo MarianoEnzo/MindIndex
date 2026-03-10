@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma.service';
 import { EmbeddingsModule } from '../embeddings/embedding.module';
 import { RetrievalController } from './retrieval.controller';
@@ -8,6 +9,6 @@ import { RetrievalService } from './retrieval.service';
   controllers: [RetrievalController],
   providers: [PrismaService, RetrievalService],
   exports: [RetrievalService],
-  imports: [EmbeddingsModule],
+  imports: [ConfigModule, EmbeddingsModule],
 })
 export class RetrievalModule {}

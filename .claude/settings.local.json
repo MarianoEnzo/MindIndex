@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install class-validator class-transformer @nestjs/throttler)"
+      "Bash(npm install class-validator class-transformer @nestjs/throttler)",
+      "Bash(npm install @nestjs/swagger swagger-ui-express)"
     ]
   }
 }

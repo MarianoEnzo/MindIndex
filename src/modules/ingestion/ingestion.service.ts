@@ -26,7 +26,47 @@ export class IngestionService {
   }
 
   async getCollections() {
-    return this.prisma.collection.findMany();
+    return this.prisma.collection.findMany({
+      include: {
+        _count: {
+          select: {
+            documents: true,
+          },
+        },
+        documents: {
+          select: {
+            chunkCount: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getCollection(id: string) {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { documents: true } },
+        documents: { select: { chunkCount: true } },
+      },
+    });
+    if (!collection) {
+      throw new NotFoundException(`Collection ${id} not found`);
+    }
+    return collection;
+  }
+
+  async getCollectionDocuments(collectionId: string) {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+    });
+    if (!collection) {
+      throw new NotFoundException(`Collection ${collectionId} not found`);
+    }
+    return this.prisma.document.findMany({
+      where: { collectionId },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async processDocument(
@@ -65,9 +105,11 @@ export class IngestionService {
         const page = await pdfDoc.getPage(i);
         const content = await page.getTextContent();
         const pageText = (content.items ?? [])
-          .map((item: { str?: string }) => item.str ?? '')
-          .join(' ');
-        fullText += pageText + ' ';
+          .map((item: { str?: string; hasEOL?: boolean }) =>
+            (item.str ?? '') + (item.hasEOL ? '\n' : ''),
+          )
+          .join('');
+        fullText += pageText + '\n';
       }
 
       if (!fullText.trim()) {
@@ -108,7 +150,10 @@ export class IngestionService {
         data: { status: 'FAILED' },
       });
       this.logger.error('Failed to process document', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to process document');
@@ -129,23 +174,45 @@ export class IngestionService {
 
   private chunkText(text: string, totalPages: number) {
     const chunkSize = this.config.get<number>('rag.chunking.size') ?? 500;
-    const overlap = this.config.get<number>('rag.chunking.overlap') ?? 50;
+    const overlap = this.config.get<number>('rag.chunking.overlap') ?? 100;
+
+    // Split into sentences, preserving the delimiter
+    const sentences = text
+      .split(/(?<=[.?!])\s+|\n{2,}/)
+      .map((s) => s.replace(/\s+/g, ' ').trim())
+      .filter((s) => s.length > 0);
+
     const chunks: {
       content: string;
       pageNumber: number;
       position: number;
       tokenCount: number;
     }[] = [];
-    const words = text.split(/\s+/).filter(Boolean);
+
+    const totalWords = text.split(/\s+/).filter(Boolean).length;
+    let wordsCovered = 0;
     let position = 0;
+    let i = 0;
 
-    for (let i = 0; i < words.length; i += chunkSize - overlap) {
-      const slice = words.slice(i, i + chunkSize);
-      if (slice.length < 20) break;
+    while (i < sentences.length) {
+      const window: string[] = [];
+      let wordCount = 0;
 
-      const content = slice.join(' ');
+      // Build chunk up to chunkSize words
+      let j = i;
+      while (j < sentences.length) {
+        const sentenceWords = sentences[j].split(/\s+/).length;
+        if (wordCount + sentenceWords > chunkSize && window.length > 0) break;
+        window.push(sentences[j]);
+        wordCount += sentenceWords;
+        j++;
+      }
+
+      if (window.length === 0) break;
+
+      const content = window.join(' ');
       const estimatedPage = Math.min(
-        Math.ceil((i / words.length) * totalPages || 1),
+        Math.ceil((wordsCovered / totalWords) * totalPages) || 1,
         totalPages,
       );
 
@@ -153,8 +220,19 @@ export class IngestionService {
         content,
         pageNumber: estimatedPage,
         position: position++,
-        tokenCount: Math.ceil(slice.length * 1.3),
+        tokenCount: Math.ceil(wordCount * 1.3),
       });
+
+      wordsCovered += wordCount;
+
+      // Step back `overlap` words to create continuity
+      let overlapWords = 0;
+      let step = j - 1;
+      while (step > i && overlapWords < overlap) {
+        overlapWords += sentences[step].split(/\s+/).length;
+        step--;
+      }
+      i = Math.max(i + 1, step + 1);
     }
 
     return chunks;
