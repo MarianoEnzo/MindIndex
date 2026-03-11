@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/common/prisma.service';
 import { ChunkResult } from 'src/common/types/chunk-result.type';
@@ -18,7 +14,11 @@ export class RetrievalService {
     private config: ConfigService,
   ) {}
 
-  async search(query: string, topK: number, collectionId: string): Promise<ChunkResult[]> {
+  async search(
+    query: string,
+    topK: number,
+    collectionId: string,
+  ): Promise<ChunkResult[]> {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
     });
@@ -26,13 +26,15 @@ export class RetrievalService {
       throw new NotFoundException(`Collection ${collectionId} not found`);
     }
 
-    const resolvedTopK = topK ?? this.config.get<number>('rag.retrieval.topK') ?? 5;
-    const threshold = this.config.get<number>('rag.retrieval.similarityThreshold') ?? 0.3;
+    const resolvedTopK =
+      topK ?? this.config.get<number>('rag.retrieval.topK') ?? 5;
+    const threshold =
+      this.config.get<number>('rag.retrieval.similarityThreshold') ?? 0.3;
 
     const vector = await this.embeddingService.generateSingle(query);
     const vectorStr = `[${vector.join(',')}]`;
 
-    const results = await this.prisma.$queryRawUnsafe<ChunkResult[]>(
+    const results: ChunkResult[] = await this.prisma.$queryRawUnsafe(
       `SELECT c.id, c.content, c.page_number as "pageNumber", 1 - (c.embedding <=> $1::vector) as similarity
        FROM chunks c
        JOIN documents d ON c.document_id = d.id
@@ -50,6 +52,6 @@ export class RetrievalService {
     this.logger.log(
       `Search in collection ${collectionId}: ${results.length} results (topK=${resolvedTopK}, threshold=${threshold})`,
     );
-    return results;
+    return results as ChunkResult[];
   }
 }
