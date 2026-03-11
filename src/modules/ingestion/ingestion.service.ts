@@ -100,23 +100,25 @@ export class IngestionService {
         throw new BadRequestException('PDF has no pages');
       }
 
-      let fullText = '';
+      const pages: { pageNumber: number; text: string }[] = [];
       for (let i = 1; i <= numPages; i++) {
         const page = await pdfDoc.getPage(i);
         const content = await page.getTextContent();
         const pageText = (content.items ?? [])
           .map((item: { str?: string; hasEOL?: boolean }) =>
-            (item.str ?? '') + (item.hasEOL ? '\n' : ''),
+            (item.str ?? '') + (item.hasEOL ? '\n' : (item.str?.endsWith(' ') ? '' : ' ')),
           )
           .join('');
-        fullText += pageText + '\n';
+        if (pageText.trim()) {
+          pages.push({ pageNumber: i, text: pageText });
+        }
       }
 
-      if (!fullText.trim()) {
+      if (pages.length === 0) {
         throw new BadRequestException('PDF contains no extractable text');
       }
 
-      const chunks = this.chunkText(fullText, numPages);
+      const chunks = this.chunkText(pages);
 
       await this.prisma.chunk.createMany({
         data: chunks.map((chunk) => ({
@@ -172,15 +174,16 @@ export class IngestionService {
     return this.embeddingService.generateForDocument(documentId);
   }
 
-  private chunkText(text: string, totalPages: number) {
+  private chunkText(pages: { pageNumber: number; text: string }[]) {
     const chunkSize = this.config.get<number>('rag.chunking.size') ?? 500;
     const overlap = this.config.get<number>('rag.chunking.overlap') ?? 100;
 
-    // Split into sentences, preserving the delimiter
-    const sentences = text
-      .split(/(?<=[.?!])\s+|\n{2,}/)
-      .map((s) => s.replace(/\s+/g, ' ').trim())
-      .filter((s) => s.length > 0);
+    const tokens: { word: string; pageNumber: number }[] = [];
+    for (const { pageNumber, text } of pages) {
+      for (const word of text.split(/\s+/).filter(Boolean)) {
+        tokens.push({ word, pageNumber });
+      }
+    }
 
     const chunks: {
       content: string;
@@ -189,50 +192,21 @@ export class IngestionService {
       tokenCount: number;
     }[] = [];
 
-    const totalWords = text.split(/\s+/).filter(Boolean).length;
-    let wordsCovered = 0;
-    let position = 0;
     let i = 0;
+    let position = 0;
 
-    while (i < sentences.length) {
-      const window: string[] = [];
-      let wordCount = 0;
-
-      // Build chunk up to chunkSize words
-      let j = i;
-      while (j < sentences.length) {
-        const sentenceWords = sentences[j].split(/\s+/).length;
-        if (wordCount + sentenceWords > chunkSize && window.length > 0) break;
-        window.push(sentences[j]);
-        wordCount += sentenceWords;
-        j++;
-      }
-
-      if (window.length === 0) break;
-
-      const content = window.join(' ');
-      const estimatedPage = Math.min(
-        Math.ceil((wordsCovered / totalWords) * totalPages) || 1,
-        totalPages,
-      );
+    while (i < tokens.length) {
+      const slice = tokens.slice(i, i + chunkSize);
+      if (slice.length < 20) break;
 
       chunks.push({
-        content,
-        pageNumber: estimatedPage,
+        content: slice.map((t) => t.word).join(' '),
+        pageNumber: slice[0].pageNumber,
         position: position++,
-        tokenCount: Math.ceil(wordCount * 1.3),
+        tokenCount: Math.ceil(slice.length * 1.3),
       });
 
-      wordsCovered += wordCount;
-
-      // Step back `overlap` words to create continuity
-      let overlapWords = 0;
-      let step = j - 1;
-      while (step > i && overlapWords < overlap) {
-        overlapWords += sentences[step].split(/\s+/).length;
-        step--;
-      }
-      i = Math.max(i + 1, step + 1);
+      i += chunkSize - overlap;
     }
 
     return chunks;
