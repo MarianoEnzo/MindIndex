@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     cors: {
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+      origin: process.env.CORS_ORIGIN || 'https://mindindex.mequiroga.com/',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
@@ -24,7 +24,7 @@ async function bootstrap() {
     .setTitle('MindIndex API')
     .setDescription(
       'RAG (Retrieval-Augmented Generation) backend API. ' +
-      'Supports document ingestion, semantic search, and AI-powered chat over your document collections.',
+        'Supports document ingestion, semantic search, and AI-powered chat over your document collections.',
     )
     .setVersion('1.0')
     .addTag('Collections', 'Manage document collections')
