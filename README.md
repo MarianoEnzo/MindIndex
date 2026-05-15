@@ -1,98 +1,194 @@
+<h1 align="center">
+  <br>
+  🧠 MindIndex
+  <br>
+</h1>
+
+<h4 align="center">A production-ready RAG backend for intelligent document search and AI-powered chat.</h4>
+
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-E0234E?style=flat-square&logo=nestjs&logoColor=white" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-pgvector-336791?style=flat-square&logo=postgresql&logoColor=white" />
+  <img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-Embeddings-412991?style=flat-square&logo=openai&logoColor=white" />
+  <img alt="Anthropic" src="https://img.shields.io/badge/Anthropic-Claude-D97757?style=flat-square&logo=anthropic&logoColor=white" />
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#api-reference">API Reference</a> •
+  <a href="#configuration">Configuration</a>
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Overview
 
-## Project setup
+MindIndex is a backend service that turns your PDF documents into a searchable knowledge base. Upload documents, ask questions, and get AI-powered answers grounded in your own content — not hallucinations.
 
-```bash
-$ npm install
+Built on **NestJS**, it uses **OpenAI** to generate vector embeddings stored in **PostgreSQL with pgvector**, and **Anthropic Claude** to synthesize accurate answers from retrieved context.
+
+## Features
+
+- **PDF Ingestion** — Upload PDFs and automatically extract, chunk, and embed their content
+- **Semantic Search** — Find relevant passages using cosine similarity over pgvector
+- **AI Chat** — Get answers from Claude grounded in your document collection
+- **Streaming** — Real-time SSE streaming for chat responses with step-by-step progress events
+- **Collections** — Organize documents into named collections
+- **Swagger UI** — Interactive API documentation out of the box
+- **Rate Limiting** — Built-in throttling (100 req/60s)
+
+## Architecture
+
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────────────┐
+│  PDF Upload  │───▶│  Ingestion   │───▶│  OpenAI Embeddings  │
+└─────────────┘    └──────────────┘    └──────────┬──────────┘
+                                                   │
+                                        ┌──────────▼──────────┐
+                                        │  PostgreSQL+pgvector │
+                                        └──────────┬──────────┘
+                                                   │
+┌─────────────┐    ┌──────────────┐    ┌──────────▼──────────┐
+│    Client   │───▶│     Chat     │◀───│  Vector Retrieval   │
+└─────────────┘    └──────┬───────┘    └─────────────────────┘
+                          │
+               ┌──────────▼──────────┐
+               │   Anthropic Claude  │
+               └─────────────────────┘
 ```
 
-## Compile and run the project
+| Module | Responsibility |
+|--------|---------------|
+| `ingestion` | PDF parsing, text chunking, collection management |
+| `embeddings` | Batch embedding generation via OpenAI |
+| `retrieval` | Cosine similarity search with pgvector |
+| `chat` | RAG-powered answers with optional SSE streaming |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- Docker (for PostgreSQL with pgvector)
+- OpenAI API key
+- Anthropic API key
+
+### Installation
 
 ```bash
-# development
-$ npm run start
+# Clone the repository
+git clone https://github.com/your-username/mindindex-backend.git
+cd mindindex-backend
 
-# watch mode
-$ npm run start:dev
+# Install dependencies
+npm install
 
-# production mode
-$ npm run start:prod
+# Start PostgreSQL with pgvector
+docker-compose up -d
+
+# Set up environment variables
+cp .env.example .env
+# → fill in your API keys and DATABASE_URL
+
+# Run database migrations
+npx prisma migrate dev
+
+# Start the development server
+npm run start:dev
 ```
 
-## Run tests
+The server starts on `http://localhost:3000`. Swagger docs are available at `http://localhost:3000/docs`.
+
+## API Reference
+
+### Collections
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/ingestion/collections` | Create a new collection |
+| `GET` | `/ingestion/collections` | List all collections |
+| `GET` | `/ingestion/collections/:id` | Get collection details |
+| `GET` | `/ingestion/collections/:id/documents` | List documents in a collection |
+
+### Documents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/ingestion/upload` | Upload a PDF (multipart, max 10MB) |
+| `POST` | `/ingestion/documents/:id/reembed` | Regenerate embeddings for a document |
+
+### Search & Chat
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/retrieval/search` | Semantic search over a collection |
+| `POST` | `/chat` | Chat with context (single response) |
+| `POST` | `/chat/stream` | Chat with SSE streaming |
+
+### Example: Upload a PDF
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -X POST http://localhost:3000/ingestion/upload \
+  -F "file=@document.pdf" \
+  -F "collectionId=<uuid>"
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Example: Ask a question
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -X POST http://localhost:3000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What are the main conclusions?",
+    "collectionId": "<uuid>"
+  }'
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Configuration
 
-## Resources
+All configuration is driven by environment variables. Copy `.env.example` to `.env` and fill in the values.
 
-Check out a few resources that may come in handy when working with NestJS:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | — | PostgreSQL connection string **(required)** |
+| `OPENAI_API_KEY` | — | OpenAI API key for embeddings **(required)** |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key for chat **(required)** |
+| `PORT` | `3000` | Server port |
+| `CORS_ORIGIN` | `http://localhost:3001` | Allowed CORS origin |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Claude model to use |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `EMBEDDING_DIMENSIONS` | `1536` | Embedding vector dimensions |
+| `CHUNK_SIZE` | `500` | Token size per chunk |
+| `CHUNK_OVERLAP` | `50` | Overlapping tokens between chunks |
+| `RETRIEVAL_TOP_K` | `10` | Max chunks retrieved per query |
+| `SIMILARITY_THRESHOLD` | `0.3` | Minimum similarity score (0–1) |
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Development
 
-## Support
+```bash
+npm run start:dev     # Watch mode
+npm run lint          # Lint + auto-fix
+npm run format        # Format with Prettier
+npm test              # Unit tests
+npm run test:e2e      # End-to-end tests
+npm run test:cov      # Coverage report
+npm run build         # Compile to dist/
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Tech Stack
 
-## Stay in touch
+- **[NestJS](https://nestjs.com/)** — Node.js framework
+- **[Prisma](https://www.prisma.io/)** — ORM with PostgreSQL
+- **[pgvector](https://github.com/pgvector/pgvector)** — Vector similarity search
+- **[OpenAI SDK](https://github.com/openai/openai-node)** — Text embeddings
+- **[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python)** — Claude chat
+- **[pdfjs-dist](https://github.com/mozilla/pdf.js)** — PDF text extraction
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+<p align="center">
+  Built with ❤️ using NestJS and the Anthropic Claude API
+</p>
